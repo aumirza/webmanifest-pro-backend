@@ -4,9 +4,9 @@ from flask import Flask, jsonify, request, send_file
 from werkzeug.utils import secure_filename
 from PIL import Image
 import uuid
-from zipfile import ZipFile
 
-from backend.utils import allowed_file, get_file_path, get_image_path
+from backend.utils import allowed_file, get_file_path, get_image_path, make_zipfile
+from backend.utils.image_generator import generate_images
 
 app = Flask(__name__)
 
@@ -42,15 +42,11 @@ def crop():
 
         img = Image.open(img_path)
         os.remove(img_path)
-        # generate images and save them to temp_image_dir
-
-        with ZipFile(zip_file, 'w') as zipObj:
-            for folderName, subfolders, filenames in os.walk(temp_image_dir):
-                for filename in filenames:
-                    filePath = get_file_path(filename, folderName)
-                    zipObj.write(filePath, os.path.basename(filePath))
+        generate_images(img, temp_dir_name)
+        make_zipfile(zip_file, temp_image_dir)
 
         shutil.rmtree(temp_image_dir, ignore_errors=False, onerror=None)
+
         return send_file(zip_file, as_attachment=True)
 
     return jsonify({'message': 'error'})
