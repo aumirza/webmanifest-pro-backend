@@ -1,4 +1,7 @@
 
+from backend.app import ALLOWED_IMAGE_EXTENSIONS
+
+
 def allowed_file(filename):
     if not ('.' in filename):
         return False
