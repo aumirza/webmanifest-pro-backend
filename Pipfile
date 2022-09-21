@@ -4,10 +4,16 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-flask = "*"
+flask = {extras = ["async"], version = "*"}
 pillow = "*"
 uuid = "*"
 zipfile36 = "*"
+requests = "*"
+python-dotenv = "*"
+flask-cors = "*"
+
+[scripts]
+flask = "flask run"
 
 [dev-packages]
 

@@ -1,55 +1,87 @@
-import os
-import shutil
+from io import BytesIO
 from flask import Flask, jsonify, request, send_file
-from werkzeug.utils import secure_filename
-from PIL import Image
-import uuid
+from dotenv import load_dotenv
+from flask_cors import CORS, cross_origin
 
-from backend.utils import allowed_file, get_file_path, get_image_path, make_zipfile
-from backend.utils.image_generator import generate_images
+from bot import getTelegramFile, sendDocument, sendMessage
+from utils.image_generator import generate_images_zip
+from utils import allowed_file
 
+
+load_dotenv()
 app = Flask(__name__)
-
-app.config['IMAGE_UPLOADS_FOLDER'] = 'temp_images'
-ALLOWED_IMAGE_EXTENSIONS = ['PNG', 'JPG', 'JPEG', 'GIF']
-app.config['TEMP_ZIP_FOLDER'] = 'temp_zip'
+cors = CORS(app)
+# resources={r"/api/*": {"origins": "*"}}
 
 
-@app.route('/', methods=['GET'])
-def home():
-    return jsonify({'message': 'Hello World!'})
+@app.route('/bot/post/', methods=['POST'])
+async def webhookMessageHandler():
+    data = request.get_json()
+
+    if not 'message' in data:
+        return jsonify({'status': 'ok - no message'})
+
+    message = data['message']
+
+    chat_id = message['chat']['id']
+
+    if 'text' in message:
+        text = message['text']
+
+        if text == '/start':
+            return jsonify({
+                'method': 'sendMessage',
+                'chat_id': chat_id,
+                'text': 'Hi there! Send me a picture and \nI will generate different size images for webApp.'
+            })
+
+        else:
+            return jsonify({
+                'method': 'sendMessage',
+                'chat_id': chat_id,
+                'text': 'I am not your assistant.'
+            })
+
+    elif set(['photo', 'sticker']).issubset(message.keys()):
+
+        sendMessage(chat_id, 'Generating images...')
+
+        if 'photo' in message:
+            photo = message['photo']
+            file_id = photo[-1]['file_id']
+        elif 'sticker' in message:
+            sticker = message['sticker']
+            file_id = sticker['file_id']
+        else:
+            return jsonify({'status': 'ok - no photo or sticker'})
+
+        image = getTelegramFile(file_id)
+
+        print('Generating images...')
+        zip_path = await generate_images_zip(image)
+        print('returning zip file')
+        sendDocument(chat_id, zip_path)
+
+        return jsonify({'status': 'ok'})
+
+    return jsonify({
+        'method': 'sendMessage',
+        'chat_id': chat_id,
+        'text': 'This too hot to handle.'
+    })
 
 
-@app.route('/', methods=['POST'])
-def crop():
+@app.route('/api/upload', methods=['POST', 'OPTIONS'])
+async def main():
 
     image = request.files.get('image')
 
     if image and allowed_file(image.filename):
+        image = BytesIO(image.stream.read())
+        zip_path = await generate_images_zip(image)
+        return send_file(zip_path, download_name='images.zip', as_attachment=True)
 
-        temp_dir_name = uuid.uuid4().hex
-
-        file_name = secure_filename(image.filename)
-        temp_image_dir = get_image_path('', temp_dir_name)
-        os.mkdir(temp_image_dir)
-        img_path = get_image_path(file_name, temp_dir_name)
-        image.save(img_path)
-
-        temp_zip_dir = get_file_path(
-            app.config['TEMP_ZIP_FOLDER'], temp_dir_name)
-        os.mkdir(temp_zip_dir)
-        zip_file = os.path.join(temp_zip_dir, 'images.zip')
-
-        img = Image.open(img_path)
-        os.remove(img_path)
-        generate_images(img, temp_dir_name)
-        make_zipfile(zip_file, temp_image_dir)
-
-        shutil.rmtree(temp_image_dir, ignore_errors=False, onerror=None)
-
-        return send_file(zip_file, as_attachment=True)
-
-    return jsonify({'message': 'error'})
+    return jsonify({'message': 'No images given'}), 404
 
 
 if __name__ == '__main__':

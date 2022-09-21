@@ -1,7 +1,7 @@
 
 import os
 from zipfile import ZipFile
-from backend.app import ALLOWED_IMAGE_EXTENSIONS
+from config import ALLOWED_IMAGE_EXTENSIONS, IMAGE_UPLOADS_FOLDER, TEMP_ZIP_FOLDER
 
 
 def allowed_file(filename):
@@ -12,11 +12,11 @@ def allowed_file(filename):
 
 
 def get_image_path(filename, dir):
-    return os.path.join(os.path.dirname(__file__), app.config['IMAGE_UPLOADS_FOLDER'], dir, filename)
+    return os.path.join(os.getcwd(), IMAGE_UPLOADS_FOLDER, dir, filename)
 
 
 def get_file_path(filename, dir):
-    return os.path.join(os.path.dirname(__file__), app.config['TEMP_ZIP_FOLDER'], dir, filename)
+    return os.path.join(os.getcwd(), TEMP_ZIP_FOLDER, dir, filename)
 
 
 def make_zipfile(output_filename, source_dir):
